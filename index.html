@@ -1,0 +1,1461 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>イベント運営ナレッジベース</title>
+<style>
+/* layout concept: sticky top tab-bar (ホーム/イベント/ナレッジ蓄積) over a single
+   scrolling content column; events are a card grid that drills into a
+   two-zone detail (meta header + sub-tabs for チェックシート/ふりかえり);
+   knowledge is a filterable, category-grouped list built live from every
+   event's 課題/改善策 — nothing is ever a fixed-size slot. */
+:root{
+  --bg:#F1F4F1;
+  --surface:#FFFFFF;
+  --surface-2:#E8EDE7;
+  --ink:#14231C;
+  --ink-soft:#56635C;
+  --line:#DBE3DA;
+  --accent:#1E5C8C;
+  --accent-ink:#0E3350;
+  --good:#2E7D46;
+  --warn:#B8803A;
+  --font-display:'Zen Kaku Gothic New',"Hiragino Sans","Noto Sans JP",sans-serif;
+  --font-body:"Noto Sans JP","Hiragino Sans",sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#121715;
+    --surface:#1A211D;
+    --surface-2:#212B25;
+    --ink:#E8EEE9;
+    --ink-soft:#9CAAA2;
+    --line:#2B3630;
+    --accent:#6FA8D8;
+    --accent-ink:#D9EAF8;
+    --good:#6FBF83;
+    --warn:#E0AE6B;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121715;
+  --surface:#1A211D;
+  --surface-2:#212B25;
+  --ink:#E8EEE9;
+  --ink-soft:#9CAAA2;
+  --line:#2B3630;
+  --accent:#6FA8D8;
+  --accent-ink:#D9EAF8;
+  --good:#6FBF83;
+  --warn:#E0AE6B;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);line-height:1.6}
+h1,h2,h3,h4{font-family:var(--font-display);text-wrap:balance;margin:0}
+.wrap{max-width:980px;margin:0 auto;padding-inline:16px}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:14px}
+
+/* topbar */
+.topbar{
+  position:sticky;top:env(safe-area-inset-top,0px);z-index:20;
+  background:var(--surface);border-bottom:1px solid var(--line);
+}
+.topbar-inner{max-width:980px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{font-family:var(--font-display);font-weight:700;font-size:15px;white-space:nowrap}
+.brand small{display:block;font-family:var(--font-body);font-weight:400;font-size:11px;color:var(--ink-soft)}
+.tabs{display:flex;gap:4px;flex:1;min-width:0;flex-wrap:wrap}
+.tabbtn{
+  border:none;background:transparent;color:var(--ink-soft);padding:8px 12px;border-radius:8px;
+  font-size:13.5px;font-weight:600;transition:background .15s,color .15s;
+}
+.tabbtn:hover{background:var(--surface-2)}
+.tabbtn.active{background:var(--accent);color:#fff}
+.topbar-actions{display:flex;gap:8px;margin-left:auto}
+
+/* buttons */
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:8px;font-size:13.5px;font-weight:600}
+.btn:hover{background:var(--surface-2)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{filter:brightness(1.06)}
+.btn-primary:disabled{opacity:.6;cursor:default}
+.btn-ghost{border-color:transparent;background:transparent}
+.btn-ghost:hover{background:var(--surface-2)}
+.btn-danger{border-color:#c0564d;color:#c0564d;background:transparent}
+.btn-danger:hover{background:#c0564d;color:#fff}
+.btn-sm{padding:5px 10px;font-size:12.5px;border-radius:7px}
+.icon-btn{border:none;background:transparent;color:var(--ink-soft);width:26px;height:26px;border-radius:6px;font-size:15px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+.icon-btn:hover{background:var(--surface-2);color:var(--ink)}
+
+main.wrap{padding-block:22px 60px}
+.panel[hidden]{display:none}
+
+/* stat grid */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:28px}
+.stat-grid.small{margin-bottom:16px}
+.stat-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.stat-card .num{font-family:var(--font-mono);font-size:26px;font-weight:700;line-height:1.1}
+.stat-card .label{font-size:12px;color:var(--ink-soft);margin-top:4px}
+.stat-card .sub{font-size:11px;color:var(--ink-soft);margin-top:6px}
+
+section.panel > h2{font-size:18px;margin-bottom:4px}
+.hint{color:var(--ink-soft);font-size:13px;margin:4px 0 16px}
+
+/* recent */
+.recent-wrap h2{font-size:15px;color:var(--ink-soft);margin-bottom:10px;font-weight:700}
+.recent-list{display:flex;flex-direction:column;gap:6px}
+.recent-item{display:flex;gap:10px;align-items:baseline;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px}
+.recent-item .rtext{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent-item .rmeta{color:var(--ink-soft);font-size:11.5px;white-space:nowrap}
+.empty-state{color:var(--ink-soft);font-size:13.5px;background:var(--surface);border:1px dashed var(--line);border-radius:12px;padding:24px;text-align:center}
+
+/* events */
+.events-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:10px;flex-wrap:wrap}
+.event-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.event-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;cursor:pointer;transition:border-color .15s,transform .1s;display:flex;flex-direction:column;gap:8px}
+.event-card:hover{border-color:var(--accent)}
+.event-card h3{font-size:15px}
+.event-card .ecard-meta{font-size:12px;color:var(--ink-soft)}
+.chip-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.chip{font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px;font-family:var(--font-mono)}
+.chip-good{background:color-mix(in srgb,var(--good) 16%,transparent);color:var(--good)}
+.chip-issue{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.chip-improve{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent-ink)}
+.chip-idea{background:var(--surface-2);color:var(--ink-soft)}
+.chip-prep{background:var(--surface-2);color:var(--ink-soft)}
+
+/* event detail */
+.detail-header{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:14px 0 16px}
+.detail-header-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.detail-header h2{font-size:20px}
+.detail-actions{display:flex;gap:6px;flex-shrink:0}
+.meta-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 18px;margin-top:14px}
+.meta-item .k{font-size:11px;color:var(--ink-soft);margin-bottom:2px}
+.meta-item .v{font-size:13.5px}
+.confirm-row{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--warn);margin-top:10px}
+
+.event-subtabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--line)}
+.subtabbtn{border:none;background:transparent;color:var(--ink-soft);padding:9px 14px;font-size:13.5px;font-weight:700;border-bottom:2px solid transparent;margin-bottom:-1px}
+.subtabbtn.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+.section-block{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px}
+.section-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.section-head .dot{width:9px;height:9px;border-radius:50%}
+.section-head h3{font-size:14.5px;flex:1}
+.section-count{font-family:var(--font-mono);font-size:12px;color:var(--ink-soft)}
+.dot-good{background:var(--good)}
+.dot-issue{background:var(--warn)}
+.dot-improve{background:var(--accent)}
+.dot-idea{background:var(--ink-soft)}
+
+.item-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.item-row{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:9px;background:var(--surface-2)}
+.item-text{flex:1;min-width:0;font-size:13.5px;overflow-wrap:break-word}
+.item-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.tag{font-size:10.5px;color:var(--ink-soft);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.status-pill{font-size:10.5px;font-weight:700;border:none;border-radius:999px;padding:3px 9px;white-space:nowrap}
+.status-未着手{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
+.status-着手済み{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent-ink)}
+.status-定着済み{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+
+.add-row{display:flex;gap:8px;margin-top:10px}
+.add-row input{flex:1;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:8px 10px}
+.add-row input:focus{outline:2px solid var(--accent);outline-offset:1px}
+
+/* checklist */
+.checklist-progress{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.checklist-progress .cp-num{font-family:var(--font-mono);font-size:22px;font-weight:700}
+.checklist-progress .cp-bar{flex:1;min-width:140px;height:8px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.checklist-progress .cp-fill{height:100%;background:var(--accent);border-radius:999px;transition:width .2s}
+.checklist-progress .cp-label{font-size:12px;color:var(--ink-soft)}
+.chk-phase{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px}
+.chk-phase-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.chk-phase-head h3{font-size:15px;flex-shrink:0}
+.chk-phase-bar{flex:1;height:6px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.chk-phase-fill{height:100%;background:var(--good);border-radius:999px;transition:width .2s}
+.chk-phase-pct{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-soft);flex-shrink:0}
+.chk-section{margin-bottom:12px}
+.chk-section:last-child{margin-bottom:0}
+.chk-section-head{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+.chk-section-head h4{font-size:13px;color:var(--ink-soft);flex:1}
+.chk-count{font-size:11px;color:var(--ink-soft)}
+.chk-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
+.chk-item{display:flex;align-items:flex-start;gap:9px;padding:5px 2px}
+.chk-box{width:19px;height:19px;border-radius:6px;border:1.5px solid var(--line);background:var(--surface);flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;margin-top:1px}
+.chk-item.done .chk-box{background:var(--good);border-color:var(--good)}
+.chk-label{font-size:13.5px}
+.chk-item.done .chk-label{color:var(--ink-soft);text-decoration:line-through}
+.chk-label-wrap{flex:1;min-width:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.chk-item-actions{display:flex;gap:2px;flex-shrink:0;margin-top:1px}
+.chk-edit-input{flex:1;min-width:120px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:7px;padding:5px 8px;font-size:13.5px}
+.chk-empty-hint{color:var(--ink-soft);font-size:12.5px;margin:2px 0 0;font-style:italic}
+.timetable-wrap{overflow-x:auto;margin-bottom:10px}
+table.timetable{width:100%;border-collapse:collapse;font-size:13px}
+table.timetable th{text-align:left;font-size:11px;color:var(--ink-soft);font-weight:700;padding:4px 8px;border-bottom:1px solid var(--line)}
+table.timetable td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.timetable td.tt-time{white-space:nowrap}
+table.timetable td.tt-time input{width:100%;min-width:90px}
+table.timetable td.tt-content input{width:100%;min-width:140px}
+table.timetable td.tt-assignee input{width:100%;min-width:90px}
+table.timetable input.tt-input{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;padding:5px 7px}
+table.timetable td.tt-actions{width:1%;white-space:nowrap}
+
+/* knowledge */
+.knowledge-controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.knowledge-controls input,.knowledge-controls select{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:7px 10px}
+.knowledge-controls input[type=search]{flex:1;min-width:160px}
+.k-group{margin-bottom:16px}
+.k-group-head{display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.k-group-head h3{font-size:13.5px;flex:1}
+.k-group-head .cnt{font-family:var(--font-mono);font-size:12px;color:var(--ink-soft)}
+.k-row{display:flex;gap:10px;align-items:flex-start;padding:10px 4px;border-bottom:1px dashed var(--line)}
+.k-row:last-child{border-bottom:none}
+.k-type{font-size:10.5px;font-weight:700;border-radius:6px;padding:2px 7px;white-space:nowrap;margin-top:1px}
+.k-type-issue{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.k-type-improve{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent-ink)}
+.k-body{flex:1;min-width:0}
+.k-text{font-size:13.5px;overflow-wrap:break-word}
+.k-source{font-size:11.5px;color:var(--ink-soft);margin-top:3px}
+
+/* modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(10,14,12,.45);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;z-index:50}
+.modal-overlay[hidden]{display:none}
+.modal{background:var(--surface);border-radius:16px;padding:22px 22px 20px;max-width:520px;width:100%;border:1px solid var(--line)}
+.modal h2{font-size:17px;margin-bottom:14px}
+.field{margin-bottom:12px;display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;color:var(--ink-soft);font-weight:600}
+.field input,.field textarea{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:9px 10px;width:100%}
+.field textarea{resize:vertical;min-height:52px}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;align-items:center}
+.modal-progress{font-size:12px;color:var(--ink-soft);margin-right:auto}
+.help-body{font-size:13.5px;color:var(--ink-soft);display:flex;flex-direction:column;gap:10px}
+.help-body b{color:var(--ink)}
+
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:10px;font-size:13px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+.toast[hidden]{display:none}
+.offline-banner{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:12.5px;color:var(--ink-soft);margin-bottom:16px}
+
+@media (max-width:560px){
+  .topbar-inner{gap:8px}
+  .brand small{display:none}
+  .detail-header-top{flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">イベント運営ナレッジベース<small>振り返りを積み重ねる</small></div>
+    <nav class="tabs" id="tabs">
+      <button class="tabbtn" data-tab="home">ホーム</button>
+      <button class="tabbtn" data-tab="events">イベント</button>
+      <button class="tabbtn" data-tab="knowledge">ナレッジ蓄積</button>
+    </nav>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="btn-help" title="使い方">?</button>
+    </div>
+  </div>
+</div>
+
+<main class="wrap">
+  <div id="offline-banner" class="offline-banner" hidden>
+    データの保存先に接続できませんでした。表示のみのサンプルデータで動作しています。再読み込みすると復旧する場合があります。
+  </div>
+
+  <section id="panel-home" class="panel">
+    <div id="home-stats" class="stat-grid"></div>
+    <div class="recent-wrap">
+      <h2>最近の更新</h2>
+      <div id="home-recent" class="recent-list"></div>
+    </div>
+  </section>
+
+  <section id="panel-knowledge" class="panel" hidden>
+    <h2>ナレッジ蓄積</h2>
+    <p class="hint">登録済みイベントの「課題・反省点」「次回への改善策」を、カテゴリ別に自動で集約します。新しいイベントにメモを追加すると、ここにも自動で積み上がります。</p>
+    <div id="knowledge-summary" class="stat-grid small"></div>
+    <div class="knowledge-controls">
+      <input type="search" id="k-search" placeholder="キーワードで検索">
+      <select id="k-type"><option value="all">種別:すべて</option><option value="issue">課題・反省点のみ</option><option value="improve">改善策のみ</option></select>
+      <select id="k-status"><option value="all">状態:すべて</option><option value="未着手">未着手</option><option value="着手済み">着手済み</option><option value="定着済み">定着済み</option></select>
+      <select id="k-category"><option value="all">カテゴリ:すべて</option></select>
+      <select id="k-event"><option value="all">イベント:すべて</option></select>
+    </div>
+    <div id="knowledge-results"></div>
+  </section>
+
+  <section id="panel-events" class="panel" hidden>
+    <div id="events-list-view">
+      <div class="events-toolbar">
+        <h2>イベント一覧</h2>
+        <button class="btn btn-primary" id="btn-new-event">+ 新規イベント</button>
+      </div>
+      <div id="events-grid" class="event-grid"></div>
+    </div>
+    <div id="event-detail-view" hidden>
+      <button class="btn btn-ghost btn-sm" id="btn-back-events">← イベント一覧に戻る</button>
+      <div id="event-detail"></div>
+    </div>
+  </section>
+</main>
+
+<div class="modal-overlay" id="modal-event" hidden>
+  <div class="modal">
+    <h2 id="modal-event-title">新規イベント</h2>
+    <form id="form-event">
+      <div class="field"><label for="f-name">イベント名 *</label><input id="f-name" required placeholder="例: イオンタウン鈴鹿"></div>
+      <div class="field"><label for="f-date">開催日</label><input id="f-date" placeholder="例: 2026/9/21(月・祝)"></div>
+      <div class="field"><label for="f-venue">会場</label><input id="f-venue" placeholder="例: イオンタウン鈴鹿"></div>
+      <div class="field"><label for="f-programs">主な企画</label><textarea id="f-programs" placeholder="例: 選手トークショー、PK対決 など"></textarea></div>
+      <div class="field"><label for="f-players">参加選手</label><input id="f-players" placeholder="例: 山本龍之介、郷原 など"></div>
+      <div class="modal-actions">
+        <span class="modal-progress" id="event-modal-progress"></span>
+        <button type="button" class="btn btn-ghost" id="btn-cancel-event">キャンセル</button>
+        <button type="submit" class="btn btn-primary" id="btn-submit-event">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-help" hidden>
+  <div class="modal">
+    <h2>使い方</h2>
+    <div class="help-body">
+      <div><b>イベント</b>タブで「+ 新規イベント」からイベントを登録すると、事前準備〜当日〜振り返りの<b>チェックシート</b>が自動でセットされます。項目はチェックで進捗管理するだけでなく、「編集」で文言を変更したり、「×」で不要な項目を削除したり、各セクション下の入力欄から新しい項目を追加したりできます。当日のタイムスケジュール表も時間・内容・担当のすべてを自由に書き換え、「+ 行を追加」で行を増やせます。</div>
+      <div>同じ画面の<b>ふりかえり</b>タブでは「良かった点」「課題・反省点」「次回への改善策」「今後のアイデア」を好きなだけ追記できます。件数の上限はありません。</div>
+      <div><b>ナレッジ蓄積</b>タブには、すべてのイベントの「課題・反省点」と「改善策」が自動で集まります。内容のキーワードからカテゴリ(安全対策・誘導動線など)も自動で推定されるので、入力するだけで整理されていきます。ステータス(未着手/着手済み/定着済み)はタップで切り替えて、改善の定着状況を追えます。</div>
+      <div>データはこのページを開いた全員で共有されます。入力内容はすぐに他の人の画面にも反映されます。</div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-primary" id="btn-close-help">閉じる</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+"use strict";
+
+// ---------- Supabase connection ----------
+var SUPABASE_URL = "https://ankvjtawixvsggmbfekq.supabase.co";
+var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFua3ZqdGF3aXh2c2dnbWJmZWtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5Mjc2NzQsImV4cCI6MjEwNjUwMzY3NH0.bnH-pI1kt2gWLEnwMwIDiXmA0mDKlKPvASU88sHcfbw";
+
+var SECTIONS = [
+  {key:"good", label:"良かった点", dot:"dot-good", chip:"chip-good"},
+  {key:"issue", label:"課題・反省点", dot:"dot-issue", chip:"chip-issue"},
+  {key:"improve", label:"次回への改善策", dot:"dot-improve", chip:"chip-improve"},
+  {key:"idea", label:"今後のアイデア", dot:"dot-idea", chip:"chip-idea"}
+];
+var SECTION_BY_KEY = {};
+SECTIONS.forEach(function(s){ SECTION_BY_KEY[s.key] = s; });
+var STATUSES = ["未着手","着手済み","定着済み"];
+var CATEGORY_RULES = [
+  [["ボール"], "安全対策"],
+  [["誘導","動線"], "誘導・動線運営"],
+  [["声かけ","体験","ブース"], "体験ブース運営"],
+  [["備品","ネームプレート","忘れ物","什器"], "備品・持ち物"],
+  [["告知","SNS","LINE","印刷","タイムテーブル"], "告知・プロモーション"],
+  [["スタッフ","役割","配置","持ち場"], "スタッフ運営"],
+  [["時間","コンテンツ","内容が多"], "プログラム設計"]
+];
+var CATEGORIES = CATEGORY_RULES.map(function(r){return r[1];}).concat(["要分類"]);
+
+// ---------- checklist template (from イベント運営チェックシート.md) ----------
+var CHECKLIST_PHASES = [
+  {key:"prep", label:"事前準備", sections:[
+    {key:"1-1", label:"企画立案・キックオフ", items:[
+      "イベントの目的・ゴールを明確化する",
+      "ターゲット参加者(属性・人数規模)を設定する",
+      "概算予算感を確認する",
+      "開催候補日程を複数洗い出す",
+      "開催形式を検討する(オフライン/オンライン/ハイブリッド)",
+      "関係者の役割分担を決める(責任者・進行・会計・広報 など)"
+    ]},
+    {key:"1-2", label:"打ち合わせスケジュール(目安)", items:[
+      "第1回:目的・ターゲット・規模のすり合わせ",
+      "第2回:候補日程・候補会場・概算予算の確定",
+      "第3回:プログラム内容・タイムテーブルの確定",
+      "第4回(直前):最終確認・役割の最終調整",
+      "各回終了後、議事録を作成し関係者へ共有する"
+    ]},
+    {key:"1-3", label:"候補内容の検討", items:[
+      "会場候補のリストアップと比較(アクセス・収容人数・設備・費用)",
+      "日程候補の絞り込み(祝日・繁忙期・競合イベントの考慮)",
+      "プログラム内容の候補出し(講演/ワークショップ/懇親会/展示 など)",
+      "ゲスト・登壇者候補のリストアップと打診順の検討",
+      "ケータリング・飲食内容の候補比較",
+      "予算案の作成と承認取得"
+    ]},
+    {key:"1-4", label:"手配・準備", items:[
+      "会場の予約・契約",
+      "登壇者・ゲストへの正式依頼と日程確保",
+      "備品・機材の手配(マイク・プロジェクター・Wi-Fi・配信機材 等)",
+      "ケータリング・飲食の発注",
+      "集客・告知(SNS・メルマガ・案内状・プレスリリース)",
+      "参加者募集ページ・受付システムの準備",
+      "当日スタッフの手配とシフト作成",
+      "保険・安全対策の確認",
+      "緊急時対応マニュアルの作成"
+    ]},
+    {key:"1-5", label:"直前準備(1週間前〜前日)", items:[
+      "参加者数の最終確認",
+      "タイムテーブルの最終確認・関係者への共有",
+      "配布資料の印刷・準備",
+      "会場設営レイアウトの最終確認",
+      "当日の緊急連絡網の確認",
+      "天候・交通状況の確認(屋外/遠方会場の場合)"
+    ]}
+  ]},
+  {key:"day", label:"当日", hasTimetable:true, sections:[
+    {key:"2-2", label:"当日の持ち物・準備物", items:[
+      "進行台本・タイムテーブル",
+      "参加者リスト・受付用チェックシート",
+      "名札・受付用品(ペン、名札ケース等)",
+      "マイク・スピーカー・PC・プロジェクター",
+      "延長コード・電源タップ・変換アダプタ",
+      "配布資料・パンフレット・ノベルティ",
+      "文房具(養生テープ、はさみ、油性ペン等)",
+      "応急処置セット",
+      "アンケート用紙またはQRコード",
+      "予備バッテリー・モバイル充電器",
+      "釣り銭・小口現金",
+      "緊急連絡先リスト(会場担当者・搬入業者・救急含む)"
+    ]},
+    {key:"2-3", label:"当日の役割分担", items:[
+      "総合責任者","受付","進行・司会","音響・照明・機材オペレーション","誘導・会場案内","記録係(写真・動画撮影)","会計・物販対応"
+    ]},
+    {key:"2-4", label:"トラブル対応チェック", items:[
+      "機材トラブル発生時の代替手段を確認済みか",
+      "遅刻・欠席者への対応フローが決まっているか",
+      "体調不良者発生時の対応手順が共有されているか",
+      "クレーム対応の窓口・エスカレーション先が明確か"
+    ]}
+  ]},
+  {key:"retro", label:"振り返り", sections:[
+    {key:"3-1", label:"定量指標", items:[
+      "参加者数(申込数 vs 当日参加数、参加率)",
+      "予算実績(予算 vs 実績、差異とその理由)",
+      "アンケート回収率",
+      "満足度スコア(平均点・NPS等)",
+      "告知・SNS経由の反響数(閲覧数・シェア数・クリック数)",
+      "リピート率・次回参加意向の割合"
+    ]},
+    {key:"3-2", label:"定性評価", items:[
+      "良かった点の洗い出し","課題・改善点の洗い出し","参加者の自由記述コメントの整理","スタッフ・登壇者からのフィードバック収集"
+    ]},
+    {key:"3-3", label:"振り返りミーティング", items:[
+      "関係者全員での振り返り会を実施","KPT(Keep/Problem/Try)などのフレームで整理","次回への申し送り事項を文書化","登壇者・協力会社・関係者へのお礼連絡"
+    ]},
+    {key:"3-4", label:"次回への引き継ぎ", items:[
+      "良かった取り組みをテンプレート化して保存","反省点への改善策を明文化","関係者・協力会社の連絡先リストを更新","振り返りレポートを保存し、共有フォルダに格納"
+    ]}
+  ]}
+];
+var TIMETABLE_TEMPLATE = [
+  {time:"開場1〜2時間前", content:"会場入り・設営開始"},
+  {time:"開場30分前", content:"機材・受付の最終チェック"},
+  {time:"開場", content:"受付開始"},
+  {time:"開始", content:"オープニング挨拶"},
+  {time:"〜", content:"プログラム進行(講演・ワークショップ等)"},
+  {time:"終了前", content:"アンケート案内"},
+  {time:"終了", content:"クロージング挨拶・アンケート回収"},
+  {time:"終了後", content:"撤収・原状回復・忘れ物確認"}
+];
+var CHECKLIST_TOTAL_COUNT = (function(){
+  var n = 0;
+  CHECKLIST_PHASES.forEach(function(p){ p.sections.forEach(function(s){ n += s.items.length; }); });
+  return n;
+})();
+
+function categorize(text){
+  text = text || "";
+  for (var i=0;i<CATEGORY_RULES.length;i++){
+    var kws = CATEGORY_RULES[i][0];
+    for (var j=0;j<kws.length;j++){
+      if (text.indexOf(kws[j]) !== -1) return CATEGORY_RULES[i][1];
+    }
+  }
+  return "要分類";
+}
+
+function escapeHtml(s){
+  return String(s==null?"":s).replace(/[&<>"']/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];
+  });
+}
+function timeAgo(ts){
+  if(!ts) return "";
+  var diff = Date.now() - ts;
+  var m = Math.floor(diff/60000);
+  if (m < 1) return "たった今";
+  if (m < 60) return m + "分前";
+  var h = Math.floor(m/60);
+  if (h < 24) return h + "時間前";
+  var d = Math.floor(h/24);
+  if (d < 30) return d + "日前";
+  var dt = new Date(ts);
+  return (dt.getMonth()+1) + "/" + dt.getDate();
+}
+function showToast(msg){
+  var t = document.getElementById("toast");
+  t.textContent = msg;
+  t.hidden = false;
+  clearTimeout(showToast._tm);
+  showToast._tm = setTimeout(function(){ t.hidden = true; }, 2600);
+}
+
+// ---------- state ----------
+var dbApi = null;
+var dbAvailable = false;
+var events = [];      // [{id,name,date,venue,programs,players,createdAt}]
+var items = [];       // [{id,eventId,type,text,status,createdAt}]
+var checklist = [];   // [{id,eventId,phase,section,sectionLabel,label,checked,order}]
+var timetable = [];   // [{id,eventId,order,time,content,assignee}]
+var state = {
+  tab: "home",
+  selectedEventId: null,
+  eventSubTab: "checklist",
+  pendingDeleteEventId: null,
+  pendingDeleteItemId: null,
+  pendingDeleteChecklistId: null,
+  editingChecklistId: null,
+  pendingDeleteTimetableId: null,
+  editEventId: null,
+  kFilters: {search:"", type:"all", status:"all", category:"all", eventId:"all"}
+};
+
+function eventsById(){
+  var map = {};
+  events.forEach(function(e){ map[e.id] = e; });
+  return map;
+}
+function itemsForEvent(eventId){
+  return items.filter(function(it){ return it.eventId === eventId; });
+}
+function checklistForEvent(eventId){
+  return checklist.filter(function(c){ return c.eventId === eventId; });
+}
+function timetableForEvent(eventId){
+  return timetable.filter(function(t){ return t.eventId === eventId; });
+}
+function countsForEvent(eventId){
+  var c = {good:0,issue:0,improve:0,idea:0};
+  itemsForEvent(eventId).forEach(function(it){ if (c[it.type] !== undefined) c[it.type]++; });
+  return c;
+}
+function checklistProgressForEvent(eventId){
+  var rows = checklistForEvent(eventId);
+  var done = rows.filter(function(r){ return r.checked; }).length;
+  return {done:done, total:rows.length};
+}
+
+// ---------- render: tabs ----------
+function setTab(tab){
+  state.tab = tab;
+  document.querySelectorAll(".tabbtn").forEach(function(b){
+    b.classList.toggle("active", b.dataset.tab === tab);
+  });
+  ["home","events","knowledge"].forEach(function(t){
+    document.getElementById("panel-"+t).hidden = (t !== tab);
+  });
+  if (tab === "home") renderHome();
+  if (tab === "events") renderEventsTab();
+  if (tab === "knowledge") renderKnowledgeTab();
+  try { if (location.hash.slice(1) !== tab) history.replaceState(null,"","#"+tab); } catch(e){}
+}
+
+// ---------- render: home ----------
+function renderHome(){
+  var totals = {good:0,issue:0,improve:0,idea:0};
+  items.forEach(function(it){ if (totals[it.type]!==undefined) totals[it.type]++; });
+  var settled = items.filter(function(it){ return (it.type==="issue"||it.type==="improve") && it.status==="定着済み"; }).length;
+  var tracked = items.filter(function(it){ return it.type==="issue"||it.type==="improve"; }).length;
+
+  var prepPct = "—";
+  if (events.length && checklist.length){
+    var sumPct = 0, n = 0;
+    events.forEach(function(ev){
+      var p = checklistProgressForEvent(ev.id);
+      if (p.total){ sumPct += p.done/p.total; n++; }
+    });
+    if (n) prepPct = Math.round(sumPct/n*100)+"%";
+  }
+
+  var stats = [
+    {num: events.length, label:"登録イベント数"},
+    {num: totals.good, label:"良かった点"},
+    {num: totals.issue, label:"課題・反省点"},
+    {num: totals.improve, label:"次回への改善策"},
+    {num: totals.idea, label:"今後のアイデア"},
+    {num: tracked? Math.round(settled/tracked*100)+"%" : "—", label:"ナレッジ定着率", sub: tracked+"件中"+settled+"件が定着済み"},
+    {num: prepPct, label:"準備チェック平均進捗"}
+  ];
+  document.getElementById("home-stats").innerHTML = stats.map(function(s){
+    return '<div class="stat-card"><div class="num mono">'+escapeHtml(s.num)+'</div><div class="label">'+escapeHtml(s.label)+'</div>'+(s.sub?'<div class="sub">'+escapeHtml(s.sub)+'</div>':'')+'</div>';
+  }).join("");
+
+  var evMap = eventsById();
+  var recent = items.slice().sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); }).slice(0,8);
+  var recentHtml;
+  if (!recent.length){
+    recentHtml = '<div class="empty-state">まだ記録がありません。「イベント」タブからイベントを登録して、振り返りを書き始めましょう。</div>';
+  } else {
+    recentHtml = recent.map(function(it){
+      var ev = evMap[it.eventId];
+      var sec = SECTION_BY_KEY[it.type] || SECTIONS[0];
+      return '<div class="recent-item"><span class="chip '+sec.chip+'">'+escapeHtml(sec.label)+'</span><span class="rtext">'+escapeHtml(it.text)+'</span><span class="rmeta">'+escapeHtml(ev?ev.name:"?")+' ・ '+timeAgo(it.createdAt)+'</span></div>';
+    }).join("");
+  }
+  document.getElementById("home-recent").innerHTML = recentHtml;
+}
+
+// ---------- render: events list ----------
+function renderEventsTab(){
+  document.getElementById("events-list-view").hidden = !!state.selectedEventId;
+  document.getElementById("event-detail-view").hidden = !state.selectedEventId;
+  if (state.selectedEventId){
+    renderEventDetail();
+  } else {
+    renderEventsGrid();
+  }
+}
+function renderEventsGrid(){
+  var grid = document.getElementById("events-grid");
+  if (!events.length){
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1">まだイベントがありません。「+ 新規イベント」から最初のイベントを登録してください。</div>';
+    return;
+  }
+  var sorted = events.slice().sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
+  grid.innerHTML = sorted.map(function(ev){
+    var c = countsForEvent(ev.id);
+    var p = checklistProgressForEvent(ev.id);
+    var prepLabel = p.total ? ("準備 "+p.done+"/"+p.total) : "準備 —";
+    return '<div class="event-card" data-id="'+ev.id+'">'+
+      '<h3>'+escapeHtml(ev.name)+'</h3>'+
+      '<div class="ecard-meta">'+escapeHtml(ev.date||"")+(ev.venue?' ・ '+escapeHtml(ev.venue):'')+'</div>'+
+      '<div class="chip-row">'+
+        '<span class="chip chip-prep">'+prepLabel+'</span>'+
+        '<span class="chip chip-good">良 '+c.good+'</span>'+
+        '<span class="chip chip-issue">課題 '+c.issue+'</span>'+
+        '<span class="chip chip-improve">改善 '+c.improve+'</span>'+
+        '<span class="chip chip-idea">案 '+c.idea+'</span>'+
+      '</div>'+
+    '</div>';
+  }).join("");
+  grid.querySelectorAll(".event-card").forEach(function(card){
+    card.addEventListener("click", function(){ selectEvent(card.dataset.id); });
+  });
+}
+function selectEvent(id){
+  state.selectedEventId = id;
+  state.pendingDeleteEventId = null;
+  renderEventsTab();
+}
+
+// ---------- render: event detail ----------
+function renderEventDetail(){
+  var root = document.getElementById("event-detail");
+  var ev = eventsById()[state.selectedEventId];
+  if (!ev){
+    state.selectedEventId = null;
+    renderEventsTab();
+    return;
+  }
+  if (root.dataset.eventId !== ev.id){
+    buildEventSkeleton(root, ev);
+    root.dataset.eventId = ev.id;
+  }
+  updateEventHeader(ev);
+  SECTIONS.forEach(function(sec){ refreshSectionList(sec, ev.id); });
+  refreshChecklist(ev.id);
+}
+
+function buildEventSkeleton(root, ev){
+  root.innerHTML =
+    '<div class="detail-header" id="detail-header"></div>' +
+    '<div class="event-subtabs" id="event-subtabs">'+
+      '<button class="subtabbtn" data-subtab="checklist">チェックシート</button>'+
+      '<button class="subtabbtn" data-subtab="reflect">ふりかえり</button>'+
+    '</div>'+
+    '<div id="subpanel-checklist">'+checklistSkeletonHtml()+'</div>'+
+    '<div id="subpanel-reflect" hidden>'+SECTIONS.map(function(sec){ return sectionSkeleton(sec); }).join("")+'</div>';
+
+  root.querySelectorAll(".subtabbtn").forEach(function(b){
+    b.addEventListener("click", function(){ state.eventSubTab = b.dataset.subtab; applyEventSubTab(); });
+  });
+  SECTIONS.forEach(function(sec){ wireSection(sec, ev.id); });
+  CHECKLIST_PHASES.forEach(function(phase){
+    phase.sections.forEach(function(sec){ wireChecklistSection(phase, sec, ev.id); });
+  });
+  var ttAddBtn = document.getElementById("tt-add-btn");
+  if (ttAddBtn) ttAddBtn.addEventListener("click", function(){ addTimetableRow(ev.id); });
+  applyEventSubTab();
+}
+function applyEventSubTab(){
+  var root = document.getElementById("event-detail");
+  if (!root) return;
+  root.querySelectorAll(".subtabbtn").forEach(function(b){ b.classList.toggle("active", b.dataset.subtab === state.eventSubTab); });
+  var cp = document.getElementById("subpanel-checklist"), rp = document.getElementById("subpanel-reflect");
+  if (cp) cp.hidden = state.eventSubTab !== "checklist";
+  if (rp) rp.hidden = state.eventSubTab !== "reflect";
+}
+
+function updateEventHeader(ev){
+  var header = document.getElementById("detail-header");
+  if (!header) return;
+  var metaFields = [["日時","date"],["会場","venue"],["主な企画","programs"],["参加選手","players"]];
+  var metaHtml = metaFields.map(function(f){
+    return '<div class="meta-item"><div class="k">'+f[0]+'</div><div class="v">'+escapeHtml(ev[f[1]]||"—")+'</div></div>';
+  }).join("");
+  var deleteBlock = "";
+  if (state.pendingDeleteEventId === ev.id){
+    deleteBlock = '<div class="confirm-row">本当にこのイベントを削除しますか?(中の記録もすべて削除されます) '+
+      '<button class="btn btn-sm btn-danger" id="btn-confirm-del-event">削除する</button>'+
+      '<button class="btn btn-sm btn-ghost" id="btn-cancel-del-event">やめる</button></div>';
+  }
+  header.innerHTML =
+    '<div class="detail-header-top">'+
+      '<h2>'+escapeHtml(ev.name)+'</h2>'+
+      '<div class="detail-actions">'+
+        '<button class="btn btn-sm" id="btn-edit-event">編集</button>'+
+        '<button class="btn btn-sm btn-danger" id="btn-del-event">削除</button>'+
+      '</div>'+
+    '</div>'+
+    '<div class="meta-grid">'+metaHtml+'</div>'+
+    deleteBlock;
+  document.getElementById("btn-edit-event").addEventListener("click", function(){ openEventModal(ev.id); });
+  document.getElementById("btn-del-event").addEventListener("click", function(){ state.pendingDeleteEventId = ev.id; updateEventHeader(ev); });
+  var cBtn = document.getElementById("btn-confirm-del-event");
+  if (cBtn) cBtn.addEventListener("click", function(){ deleteEvent(ev.id); });
+  var xBtn = document.getElementById("btn-cancel-del-event");
+  if (xBtn) xBtn.addEventListener("click", function(){ state.pendingDeleteEventId = null; updateEventHeader(ev); });
+}
+
+function sectionSkeleton(sec){
+  return '<div class="section-block" data-section="'+sec.key+'">'+
+    '<div class="section-head"><span class="dot '+sec.dot+'"></span><h3>'+sec.label+'</h3><span class="section-count mono" id="count-'+sec.key+'"></span></div>'+
+    '<ul class="item-list" id="list-'+sec.key+'"></ul>'+
+    '<div class="add-row"><input type="text" id="add-input-'+sec.key+'" placeholder="'+sec.label+'を追加 (Enterで追加)"><button class="btn btn-sm btn-primary" id="add-btn-'+sec.key+'">追加</button></div>'+
+  '</div>';
+}
+function wireSection(sec, eventId){
+  var input = document.getElementById("add-input-"+sec.key);
+  var btn = document.getElementById("add-btn-"+sec.key);
+  function submit(){
+    var v = input.value.trim();
+    if (!v) return;
+    input.value = "";
+    addItem(eventId, sec.key, v);
+  }
+  btn.addEventListener("click", submit);
+  input.addEventListener("keydown", function(e){ if (e.key === "Enter"){ e.preventDefault(); submit(); } });
+}
+function refreshSectionList(sec, eventId){
+  var list = document.getElementById("list-"+sec.key);
+  if (!list) return;
+  var rows = itemsForEvent(eventId).filter(function(it){ return it.type === sec.key; })
+    .sort(function(a,b){ return (a.createdAt||0)-(b.createdAt||0); });
+  document.getElementById("count-"+sec.key).textContent = rows.length ? String(rows.length) : "";
+  if (!rows.length){
+    list.innerHTML = '<li class="empty-state">まだ記録がありません</li>';
+    return;
+  }
+  var trackStatus = (sec.key === "issue" || sec.key === "improve");
+  list.innerHTML = rows.map(function(it){
+    var right = "";
+    if (trackStatus){
+      right += '<span class="tag">'+escapeHtml(categorize(it.text))+'</span>';
+      right += '<button class="status-pill status-'+it.status+'" data-act="status" data-id="'+it.id+'">'+it.status+'</button>';
+    }
+    if (state.pendingDeleteItemId === it.id){
+      return '<li class="item-row"><span class="item-text">'+escapeHtml(it.text)+'</span><span class="item-right">'+
+        '<button class="btn btn-sm btn-danger" data-act="confirm-del" data-id="'+it.id+'">削除</button>'+
+        '<button class="btn btn-sm btn-ghost" data-act="cancel-del" data-id="'+it.id+'">戻る</button></span></li>';
+    }
+    right += '<button class="icon-btn" data-act="del" data-id="'+it.id+'" title="削除">×</button>';
+    return '<li class="item-row"><span class="item-text">'+escapeHtml(it.text)+'</span><span class="item-right">'+right+'</span></li>';
+  }).join("");
+  list.querySelectorAll("[data-act]").forEach(function(el){
+    var id = el.dataset.id, act = el.dataset.act;
+    el.addEventListener("click", function(){
+      if (act === "status") cycleStatus(id);
+      else if (act === "del"){ state.pendingDeleteItemId = id; refreshSectionList(sec, eventId); }
+      else if (act === "cancel-del"){ state.pendingDeleteItemId = null; refreshSectionList(sec, eventId); }
+      else if (act === "confirm-del"){ deleteItem(id); }
+    });
+  });
+}
+
+// ---------- render: checklist (per event) ----------
+function checklistSkeletonHtml(){
+  var html = '<div class="checklist-progress" id="chk-progress"></div>';
+  CHECKLIST_PHASES.forEach(function(phase){
+    var timetableHtml = phase.hasTimetable
+      ? '<div class="timetable-wrap"><table class="timetable"><thead><tr><th>時間目安</th><th>内容</th><th>担当</th><th></th></tr></thead><tbody id="tt-body"></tbody></table>'+
+        '<button type="button" class="btn btn-sm" id="tt-add-btn">+ 行を追加</button></div>'
+      : "";
+    var sectionsHtml = phase.sections.map(function(sec){
+      return '<div class="chk-section"><div class="chk-section-head"><h4>'+escapeHtml(sec.label)+'</h4><span class="chk-count mono" id="chk-count-'+sec.key+'"></span></div>'+
+        '<ul class="chk-list" id="chk-list-'+sec.key+'"></ul>'+
+        '<p class="chk-empty-hint" id="chk-empty-'+sec.key+'" hidden>まだ項目がありません</p>'+
+        '<div class="add-row"><input type="text" id="chk-add-input-'+sec.key+'" placeholder="項目を追加 (Enterで追加)"><button type="button" class="btn btn-sm btn-primary" id="chk-add-btn-'+sec.key+'">追加</button></div>'+
+        '</div>';
+    }).join("");
+    html += '<div class="chk-phase"><div class="chk-phase-head"><h3>'+escapeHtml(phase.label)+'</h3>'+
+      '<span class="chk-phase-bar"><span class="chk-phase-fill" id="chk-fill-'+phase.key+'" style="width:0%"></span></span>'+
+      '<span class="chk-phase-pct mono" id="chk-pct-'+phase.key+'"></span></div>'+
+      timetableHtml + sectionsHtml + '</div>';
+  });
+  return html;
+}
+function wireChecklistSection(phase, sec, eventId){
+  var input = document.getElementById("chk-add-input-"+sec.key);
+  var btn = document.getElementById("chk-add-btn-"+sec.key);
+  if (!input || !btn) return;
+  function submit(){
+    var v = input.value.trim();
+    if (!v) return;
+    input.value = "";
+    addChecklistItem(eventId, phase.key, sec.key, sec.label, v);
+  }
+  btn.addEventListener("click", submit);
+  input.addEventListener("keydown", function(e){ if (e.key === "Enter"){ e.preventDefault(); submit(); } });
+}
+// ---------- generic DOM-diff list renderer (preserves focus in open inputs) ----------
+function diffList(container, rows, buildFn, updateFn){
+  if (!container) return;
+  var existing = {};
+  Array.prototype.forEach.call(container.children, function(el){ existing[el.dataset.id] = el; });
+  var idSet = {};
+  rows.forEach(function(r){ idSet[r.id] = true; });
+  rows.forEach(function(row, idx){
+    var el = existing[row.id];
+    if (!el){
+      el = buildFn(row);
+      el.dataset.id = row.id;
+      container.appendChild(el);
+      existing[row.id] = el;
+    }
+    updateFn(el, row);
+    if (container.children[idx] !== el) container.insertBefore(el, container.children[idx] || null);
+  });
+  Object.keys(existing).forEach(function(id){
+    if (!idSet[id] && existing[id].parentNode === container) container.removeChild(existing[id]);
+  });
+}
+function refreshChecklist(eventId){
+  var rows = checklistForEvent(eventId);
+  var progressEl = document.getElementById("chk-progress");
+  if (progressEl){
+    if (!rows.length){
+      progressEl.innerHTML = '<span class="cp-label">チェックシートを準備中です…</span>';
+    } else {
+      var done = rows.filter(function(r){ return r.checked; }).length;
+      var pct = rows.length ? Math.round(done/rows.length*100) : 0;
+      progressEl.innerHTML = '<span class="cp-num mono">'+done+' / '+rows.length+'</span>'+
+        '<span class="cp-bar"><span class="cp-fill" style="width:'+pct+'%"></span></span>'+
+        '<span class="cp-label">全体進捗 '+pct+'%</span>';
+    }
+  }
+  CHECKLIST_PHASES.forEach(function(phase){
+    var phaseRows = rows.filter(function(r){ return r.phase === phase.key; });
+    var phaseDone = phaseRows.filter(function(r){ return r.checked; }).length;
+    var phasePct = phaseRows.length ? Math.round(phaseDone/phaseRows.length*100) : 0;
+    var fillEl = document.getElementById("chk-fill-"+phase.key);
+    var pctEl = document.getElementById("chk-pct-"+phase.key);
+    if (fillEl) fillEl.style.width = phasePct+"%";
+    if (pctEl) pctEl.textContent = phaseRows.length ? (phaseDone+"/"+phaseRows.length) : "";
+
+    phase.sections.forEach(function(sec){
+      var list = document.getElementById("chk-list-"+sec.key);
+      if (!list) return;
+      var secRows = rows.filter(function(r){ return r.section === sec.key; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
+      var countEl = document.getElementById("chk-count-"+sec.key);
+      if (countEl) countEl.textContent = secRows.length ? (secRows.filter(function(r){return r.checked;}).length + "/" + secRows.length) : "0";
+      var hintEl = document.getElementById("chk-empty-"+sec.key);
+      if (hintEl) hintEl.hidden = secRows.length > 0;
+      diffList(list, secRows, buildChecklistRowEl, updateChecklistRowEl);
+    });
+  });
+  refreshTimetable(eventId);
+}
+function buildChecklistRowEl(row){
+  var li = document.createElement("li");
+  li.className = "chk-item";
+  li.dataset.actionMode = "";
+  li.dataset.editing = "0";
+  li.innerHTML = '<button class="chk-box"></button><span class="chk-label-wrap"></span><span class="chk-item-actions"></span>';
+  li.querySelector(".chk-box").addEventListener("click", function(){ toggleChecklistItem(row.id); });
+  return li;
+}
+function updateChecklistRowEl(li, row){
+  li.classList.toggle("done", !!row.checked);
+  li.querySelector(".chk-box").textContent = row.checked ? "✓" : "";
+
+  var actions = li.querySelector(".chk-item-actions");
+  var wantActionMode = state.pendingDeleteChecklistId === row.id ? "confirm" : "default";
+  if (li.dataset.actionMode !== wantActionMode){
+    if (wantActionMode === "confirm"){
+      actions.innerHTML = '<button type="button" class="btn btn-sm btn-danger" data-act="confirm">削除</button><button type="button" class="btn btn-sm btn-ghost" data-act="cancel">戻る</button>';
+      actions.querySelector('[data-act="confirm"]').addEventListener("click", function(){ deleteChecklistItem(row.id); });
+      actions.querySelector('[data-act="cancel"]').addEventListener("click", function(){ state.pendingDeleteChecklistId = null; refreshChecklist(state.selectedEventId); });
+    } else {
+      actions.innerHTML = '<button type="button" class="btn btn-sm btn-ghost" data-act="edit">編集</button><button type="button" class="icon-btn" data-act="del" title="削除">×</button>';
+      actions.querySelector('[data-act="edit"]').addEventListener("click", function(){ state.editingChecklistId = row.id; refreshChecklist(state.selectedEventId); });
+      actions.querySelector('[data-act="del"]').addEventListener("click", function(){ state.pendingDeleteChecklistId = row.id; refreshChecklist(state.selectedEventId); });
+    }
+    li.dataset.actionMode = wantActionMode;
+  }
+
+  var wrap = li.querySelector(".chk-label-wrap");
+  var wantEdit = state.editingChecklistId === row.id;
+  var isEditing = li.dataset.editing === "1";
+  if (wantEdit && !isEditing){
+    wrap.innerHTML = '<input type="text" class="chk-edit-input"><button type="button" class="btn btn-sm btn-primary" data-act="save">保存</button><button type="button" class="btn btn-sm btn-ghost" data-act="cancel-edit">キャンセル</button>';
+    var inp = wrap.querySelector("input");
+    inp.value = row.label;
+    function save(){
+      var v = inp.value.trim();
+      state.editingChecklistId = null;
+      if (v && v !== row.label) updateChecklistItem(row.id, {label:v});
+      else refreshChecklist(state.selectedEventId);
+    }
+    inp.addEventListener("keydown", function(e){
+      if (e.key === "Enter"){ e.preventDefault(); save(); }
+      else if (e.key === "Escape"){ state.editingChecklistId = null; refreshChecklist(state.selectedEventId); }
+    });
+    wrap.querySelector('[data-act="save"]').addEventListener("click", save);
+    wrap.querySelector('[data-act="cancel-edit"]').addEventListener("click", function(){ state.editingChecklistId = null; refreshChecklist(state.selectedEventId); });
+    li.dataset.editing = "1";
+    setTimeout(function(){ inp.focus(); inp.select(); }, 0);
+  } else if (!wantEdit && isEditing){
+    wrap.innerHTML = '<span class="chk-label"></span>';
+    wrap.querySelector(".chk-label").textContent = row.label;
+    li.dataset.editing = "0";
+  } else if (!wantEdit && !isEditing){
+    var lbl = wrap.querySelector(".chk-label");
+    if (!lbl){ wrap.innerHTML = '<span class="chk-label"></span>'; lbl = wrap.querySelector(".chk-label"); }
+    lbl.textContent = row.label;
+  }
+  // when wantEdit && isEditing: leave the open input untouched so typed text survives re-renders
+}
+function refreshTimetable(eventId){
+  var tbody = document.getElementById("tt-body");
+  if (!tbody) return;
+  var rows = timetableForEvent(eventId).sort(function(a,b){ return (a.order||0)-(b.order||0); });
+  diffList(tbody, rows, buildTimetableRowEl, updateTimetableRowEl);
+}
+function buildTimetableRowEl(row){
+  var tr = document.createElement("tr");
+  tr.dataset.actionMode = "";
+  tr.innerHTML = '<td class="tt-time"><input type="text" class="tt-input tt-time-input" placeholder="時間"></td>'+
+    '<td class="tt-content"><input type="text" class="tt-input tt-content-input" placeholder="内容"></td>'+
+    '<td class="tt-assignee"><input type="text" class="tt-input tt-assignee-input" placeholder="担当者名"></td>'+
+    '<td class="tt-actions"></td>';
+  ["time","content","assignee"].forEach(function(field){
+    var inp = tr.querySelector(".tt-"+field+"-input");
+    function commit(){ updateTimetableField(row.id, field, inp.value.trim()); }
+    inp.addEventListener("change", commit);
+    inp.addEventListener("blur", commit);
+  });
+  return tr;
+}
+function updateTimetableRowEl(tr, row){
+  ["time","content","assignee"].forEach(function(field){
+    var inp = tr.querySelector(".tt-"+field+"-input");
+    if (document.activeElement !== inp && inp.value !== (row[field] || "")) inp.value = row[field] || "";
+  });
+  var actions = tr.querySelector(".tt-actions");
+  var wantMode = state.pendingDeleteTimetableId === row.id ? "confirm" : "default";
+  if (tr.dataset.actionMode !== wantMode){
+    if (wantMode === "confirm"){
+      actions.innerHTML = '<button type="button" class="btn btn-sm btn-danger" data-act="confirm">削除</button><button type="button" class="btn btn-sm btn-ghost" data-act="cancel">戻る</button>';
+      actions.querySelector('[data-act="confirm"]').addEventListener("click", function(){ deleteTimetableRow(row.id); });
+      actions.querySelector('[data-act="cancel"]').addEventListener("click", function(){ state.pendingDeleteTimetableId = null; refreshTimetable(state.selectedEventId); });
+    } else {
+      actions.innerHTML = '<button type="button" class="icon-btn" data-act="del" title="削除">×</button>';
+      actions.querySelector('[data-act="del"]').addEventListener("click", function(){ state.pendingDeleteTimetableId = row.id; refreshTimetable(state.selectedEventId); });
+    }
+    tr.dataset.actionMode = wantMode;
+  }
+}
+function toggleChecklistItem(id){
+  var it = checklist.filter(function(c){ return c.id === id; })[0];
+  if (!it) return;
+  var nv = !it.checked;
+  if (dbAvailable){
+    dbApi.doc("checklist/"+id).update({checked:nv}).catch(function(e){ showToast("更新に失敗しました: "+e.code); });
+  } else {
+    it.checked = nv; refreshAllViews();
+  }
+}
+function addChecklistItem(eventId, phase, section, sectionLabel, label){
+  var existingOrders = checklistForEvent(eventId).map(function(r){ return r.order || 0; });
+  var nextOrder = (existingOrders.length ? Math.max.apply(null, existingOrders) : 0) + 1;
+  var data = {eventId:eventId, phase:phase, section:section, sectionLabel:sectionLabel, label:label, checked:false, order:nextOrder};
+  if (dbAvailable){
+    dbApi.collection("checklist").add(data).catch(function(e){ showToast("追加に失敗しました: "+e.code); });
+  } else {
+    data.id = "local-chk-"+Math.random().toString(36).slice(2);
+    checklist.push(data); refreshAllViews();
+  }
+}
+function updateChecklistItem(id, patch){
+  if (dbAvailable){
+    dbApi.doc("checklist/"+id).update(patch).catch(function(e){ showToast("更新に失敗しました: "+e.code); });
+  } else {
+    var it = checklist.filter(function(c){ return c.id === id; })[0];
+    if (it) Object.assign(it, patch);
+    refreshAllViews();
+  }
+}
+function deleteChecklistItem(id){
+  state.pendingDeleteChecklistId = null;
+  if (dbAvailable){
+    dbApi.doc("checklist/"+id).delete().catch(function(e){ showToast("削除に失敗しました: "+e.code); });
+  } else {
+    checklist = checklist.filter(function(c){ return c.id !== id; }); refreshAllViews();
+  }
+}
+function addTimetableRow(eventId){
+  var existingOrders = timetableForEvent(eventId).map(function(r){ return r.order || 0; });
+  var nextOrder = (existingOrders.length ? Math.max.apply(null, existingOrders) : 0) + 1;
+  var data = {eventId:eventId, order:nextOrder, time:"", content:"", assignee:""};
+  if (dbAvailable){
+    dbApi.collection("timetable").add(data).catch(function(e){ showToast("追加に失敗しました: "+e.code); });
+  } else {
+    data.id = "local-tt-"+Math.random().toString(36).slice(2);
+    timetable.push(data); refreshAllViews();
+  }
+}
+function updateTimetableField(id, field, val){
+  var patch = {};
+  patch[field] = val;
+  if (dbAvailable){
+    dbApi.doc("timetable/"+id).update(patch).catch(function(e){ showToast("更新に失敗しました: "+e.code); });
+  } else {
+    var r = timetable.filter(function(x){ return x.id === id; })[0];
+    if (r) r[field] = val;
+  }
+}
+function deleteTimetableRow(id){
+  state.pendingDeleteTimetableId = null;
+  if (dbAvailable){
+    dbApi.doc("timetable/"+id).delete().catch(function(e){ showToast("削除に失敗しました: "+e.code); });
+  } else {
+    timetable = timetable.filter(function(t){ return t.id !== id; }); refreshAllViews();
+  }
+}
+async function provisionChecklist(eventId, onProgress){
+  var order = 0, done = 0;
+  var total = CHECKLIST_TOTAL_COUNT + TIMETABLE_TEMPLATE.length;
+  if (!dbAvailable){
+    CHECKLIST_PHASES.forEach(function(phase){
+      phase.sections.forEach(function(sec){
+        sec.items.forEach(function(label){
+          order++;
+          checklist.push({id:"local-chk-"+Math.random().toString(36).slice(2), eventId:eventId, phase:phase.key, section:sec.key, sectionLabel:sec.label, label:label, checked:false, order:order});
+        });
+      });
+    });
+    TIMETABLE_TEMPLATE.forEach(function(row, i){
+      timetable.push(Object.assign({id:"local-tt-"+Math.random().toString(36).slice(2), eventId:eventId, order:i+1}, row, {assignee:""}));
+    });
+    return;
+  }
+  for (var p=0;p<CHECKLIST_PHASES.length;p++){
+    var phase = CHECKLIST_PHASES[p];
+    for (var s=0;s<phase.sections.length;s++){
+      var sec = phase.sections[s];
+      for (var i=0;i<sec.items.length;i++){
+        order++;
+        try {
+          await dbApi.collection("checklist").add({eventId:eventId, phase:phase.key, section:sec.key, sectionLabel:sec.label, label:sec.items[i], checked:false, order:order});
+        } catch(e){ /* keep going even if one write fails */ }
+        done++;
+        if (onProgress) onProgress(done, total);
+      }
+    }
+  }
+  for (var t=0;t<TIMETABLE_TEMPLATE.length;t++){
+    try {
+      await dbApi.collection("timetable").add(Object.assign({eventId:eventId, order:t+1}, TIMETABLE_TEMPLATE[t], {assignee:""}));
+    } catch(e){ /* keep going */ }
+    done++;
+    if (onProgress) onProgress(done, total);
+  }
+}
+
+// ---------- render: knowledge ----------
+function populateKnowledgeSelects(){
+  var catSel = document.getElementById("k-category");
+  if (catSel.options.length <= 1){
+    CATEGORIES.forEach(function(c){
+      var o = document.createElement("option"); o.value = c; o.textContent = c; catSel.appendChild(o);
+    });
+  }
+  var evSel = document.getElementById("k-event");
+  var existing = Array.prototype.slice.call(evSel.options).map(function(o){return o.value;});
+  events.slice().sort(function(a,b){return (a.createdAt||0)-(b.createdAt||0);}).forEach(function(ev){
+    if (existing.indexOf(ev.id) === -1){
+      var o = document.createElement("option"); o.value = ev.id; o.textContent = ev.name; evSel.appendChild(o);
+    }
+  });
+}
+function renderKnowledgeTab(){
+  populateKnowledgeSelects();
+  renderKnowledgeResults();
+}
+function knowledgeItems(){
+  return items.filter(function(it){ return it.type === "issue" || it.type === "improve"; });
+}
+function renderKnowledgeResults(){
+  var all = knowledgeItems();
+  var total = all.length;
+  var byStatus = {"未着手":0,"着手済み":0,"定着済み":0};
+  all.forEach(function(it){ if (byStatus[it.status]!==undefined) byStatus[it.status]++; });
+  document.getElementById("knowledge-summary").innerHTML = [
+    {num:total,label:"ナレッジ件数"},
+    {num:byStatus["未着手"],label:"未着手"},
+    {num:byStatus["着手済み"],label:"着手済み"},
+    {num:byStatus["定着済み"],label:"定着済み"}
+  ].map(function(s){
+    return '<div class="stat-card"><div class="num mono">'+s.num+'</div><div class="label">'+s.label+'</div></div>';
+  }).join("");
+
+  var f = state.kFilters;
+  var evMap = eventsById();
+  var filtered = all.filter(function(it){
+    if (f.type !== "all" && it.type !== f.type) return false;
+    if (f.status !== "all" && it.status !== f.status) return false;
+    if (f.eventId !== "all" && it.eventId !== f.eventId) return false;
+    var cat = categorize(it.text);
+    if (f.category !== "all" && cat !== f.category) return false;
+    if (f.search && it.text.toLowerCase().indexOf(f.search.toLowerCase()) === -1) return false;
+    return true;
+  });
+
+  var results = document.getElementById("knowledge-results");
+  if (!filtered.length){
+    results.innerHTML = '<div class="empty-state">条件に一致するナレッジがありません。</div>';
+    return;
+  }
+  var groups = {};
+  filtered.forEach(function(it){
+    var cat = categorize(it.text);
+    (groups[cat] = groups[cat] || []).push(it);
+  });
+  var catOrder = CATEGORIES.filter(function(c){ return groups[c]; });
+  results.innerHTML = catOrder.map(function(cat){
+    var rows = groups[cat].slice().sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
+    var rowsHtml = rows.map(function(it){
+      var ev = evMap[it.eventId];
+      return '<div class="k-row">'+
+        '<span class="k-type k-type-'+it.type+'">'+(it.type==="issue"?"課題":"改善策")+'</span>'+
+        '<div class="k-body"><div class="k-text">'+escapeHtml(it.text)+'</div>'+
+          '<div class="k-source">'+escapeHtml(ev?ev.name:"?")+(ev&&ev.date?' ・ '+escapeHtml(ev.date):'')+'</div></div>'+
+        '<button class="status-pill status-'+it.status+'" data-act="status" data-id="'+it.id+'">'+it.status+'</button>'+
+      '</div>';
+    }).join("");
+    return '<div class="k-group"><div class="k-group-head"><h3>'+escapeHtml(cat)+'</h3><span class="cnt mono">'+rows.length+'件</span></div>'+rowsHtml+'</div>';
+  }).join("");
+  results.querySelectorAll('[data-act="status"]').forEach(function(el){
+    el.addEventListener("click", function(){ cycleStatus(el.dataset.id); });
+  });
+}
+
+// ---------- data mutations ----------
+function nextStatus(s){
+  var i = STATUSES.indexOf(s);
+  return STATUSES[(i+1) % STATUSES.length];
+}
+function cycleStatus(id){
+  var it = items.filter(function(x){return x.id===id;})[0];
+  if (!it) return;
+  var ns = nextStatus(it.status || "未着手");
+  if (dbAvailable){
+    dbApi.doc("items/"+id).update({status:ns}).catch(function(e){ showToast("更新に失敗しました: "+e.code); });
+  } else {
+    it.status = ns; refreshAllViews();
+  }
+}
+function addItem(eventId, type, text){
+  var data = {eventId:eventId, type:type, text:text, status:(type==="issue"||type==="improve")?"未着手":null, createdAt:Date.now()};
+  if (dbAvailable){
+    dbApi.collection("items").add(data).catch(function(e){ showToast("追加に失敗しました: "+e.code); });
+  } else {
+    data.id = "local-"+Math.random().toString(36).slice(2);
+    items.push(data); refreshAllViews();
+  }
+}
+function deleteItem(id){
+  state.pendingDeleteItemId = null;
+  if (dbAvailable){
+    dbApi.doc("items/"+id).delete().catch(function(e){ showToast("削除に失敗しました: "+e.code); });
+  } else {
+    items = items.filter(function(it){ return it.id !== id; }); refreshAllViews();
+  }
+}
+function addEvent(data){
+  data.createdAt = Date.now();
+  if (dbAvailable){
+    return dbApi.collection("events").add(data);
+  } else {
+    data.id = "local-ev-"+Math.random().toString(36).slice(2);
+    events.push(data); refreshAllViews();
+    return Promise.resolve({id:data.id});
+  }
+}
+function updateEvent(id, patch){
+  if (dbAvailable){
+    dbApi.doc("events/"+id).update(patch).catch(function(e){ showToast("更新に失敗しました: "+e.code); });
+  } else {
+    var ev = events.filter(function(e){return e.id===id;})[0];
+    if (ev) Object.assign(ev, patch);
+    refreshAllViews();
+  }
+}
+function deleteEvent(id){
+  state.pendingDeleteEventId = null;
+  var relatedItems = itemsForEvent(id).map(function(it){ return it.id; });
+  var relatedChecklist = checklistForEvent(id).map(function(c){ return c.id; });
+  var relatedTimetable = timetableForEvent(id).map(function(t){ return t.id; });
+  if (dbAvailable){
+    var dels = relatedItems.map(function(i){ return dbApi.doc("items/"+i).delete(); })
+      .concat(relatedChecklist.map(function(i){ return dbApi.doc("checklist/"+i).delete(); }))
+      .concat(relatedTimetable.map(function(i){ return dbApi.doc("timetable/"+i).delete(); }));
+    Promise.all(dels).then(function(){ return dbApi.doc("events/"+id).delete(); })
+      .catch(function(e){ showToast("削除に失敗しました: "+e.code); });
+  } else {
+    items = items.filter(function(it){ return it.eventId !== id; });
+    checklist = checklist.filter(function(c){ return c.eventId !== id; });
+    timetable = timetable.filter(function(t){ return t.eventId !== id; });
+    events = events.filter(function(e){ return e.id !== id; });
+  }
+  state.selectedEventId = null;
+  refreshAllViews();
+}
+
+// ---------- modal: new/edit event ----------
+function openEventModal(editId){
+  state.editEventId = editId || null;
+  var ev = editId ? eventsById()[editId] : null;
+  document.getElementById("modal-event-title").textContent = ev ? "イベントを編集" : "新規イベント";
+  document.getElementById("f-name").value = ev ? ev.name : "";
+  document.getElementById("f-date").value = ev ? (ev.date||"") : "";
+  document.getElementById("f-venue").value = ev ? (ev.venue||"") : "";
+  document.getElementById("f-programs").value = ev ? (ev.programs||"") : "";
+  document.getElementById("f-players").value = ev ? (ev.players||"") : "";
+  document.getElementById("event-modal-progress").textContent = "";
+  document.getElementById("btn-submit-event").disabled = false;
+  document.getElementById("modal-event").hidden = false;
+  setTimeout(function(){ document.getElementById("f-name").focus(); }, 0);
+}
+function closeEventModal(){
+  document.getElementById("modal-event").hidden = true;
+  state.editEventId = null;
+}
+
+// ---------- wiring (static, built once) ----------
+function wireStatic(){
+  document.getElementById("tabs").addEventListener("click", function(e){
+    var b = e.target.closest(".tabbtn");
+    if (b) setTab(b.dataset.tab);
+  });
+  document.getElementById("btn-help").addEventListener("click", function(){ document.getElementById("modal-help").hidden = false; });
+  document.getElementById("btn-close-help").addEventListener("click", function(){ document.getElementById("modal-help").hidden = true; });
+
+  document.getElementById("btn-new-event").addEventListener("click", function(){ openEventModal(null); });
+  document.getElementById("btn-cancel-event").addEventListener("click", closeEventModal);
+  document.getElementById("modal-event").addEventListener("click", function(e){ if (e.target.id === "modal-event") closeEventModal(); });
+  document.getElementById("form-event").addEventListener("submit", function(e){
+    e.preventDefault();
+    var data = {
+      name: document.getElementById("f-name").value.trim(),
+      date: document.getElementById("f-date").value.trim(),
+      venue: document.getElementById("f-venue").value.trim(),
+      programs: document.getElementById("f-programs").value.trim(),
+      players: document.getElementById("f-players").value.trim()
+    };
+    if (!data.name) return;
+    if (state.editEventId){
+      updateEvent(state.editEventId, data);
+      closeEventModal();
+    } else {
+      var submitBtn = document.getElementById("btn-submit-event");
+      var progressEl = document.getElementById("event-modal-progress");
+      submitBtn.disabled = true;
+      progressEl.textContent = "作成中…";
+      addEvent(data).then(function(ref){
+        return provisionChecklist(ref.id, function(done, total){
+          progressEl.textContent = "チェックシートを準備中… ("+done+"/"+total+")";
+        }).then(function(){ return ref; });
+      }).then(function(ref){
+        closeEventModal();
+        state.selectedEventId = ref.id;
+        state.eventSubTab = "checklist";
+        setTab("events");
+        showToast("イベントを作成し、チェックシートを準備しました");
+      }).catch(function(e){
+        submitBtn.disabled = false;
+        progressEl.textContent = "";
+        showToast("保存に失敗しました: "+(e&&e.code||""));
+      });
+    }
+  });
+
+  document.getElementById("btn-back-events").addEventListener("click", function(){
+    state.selectedEventId = null; state.pendingDeleteEventId = null; renderEventsTab();
+  });
+
+  ["k-search","k-type","k-status","k-category","k-event"].forEach(function(id){
+    var el = document.getElementById(id);
+    var evt = (id === "k-search") ? "input" : "change";
+    el.addEventListener(evt, function(){
+      state.kFilters.search = document.getElementById("k-search").value.trim();
+      state.kFilters.type = document.getElementById("k-type").value;
+      state.kFilters.status = document.getElementById("k-status").value;
+      state.kFilters.category = document.getElementById("k-category").value;
+      state.kFilters.eventId = document.getElementById("k-event").value;
+      renderKnowledgeResults();
+    });
+  });
+}
+
+function refreshAllViews(){
+  if (state.tab === "home") renderHome();
+  else if (state.tab === "events") { renderEventsTab(); }
+  else if (state.tab === "knowledge") renderKnowledgeTab();
+}
+
+// ---------- Supabase-backed dbApi (mirrors the {collection,doc}.onSnapshot/add/update/delete shape) ----------
+var COLUMN_MAPS = {
+  events:    {name:"name", date:"date", venue:"venue", programs:"programs", players:"players"},
+  items:     {eventId:"event_id", type:"type", text:"text", status:"status"},
+  checklist: {eventId:"event_id", phase:"phase", section:"section_key", sectionLabel:"section_label", label:"label", checked:"checked", order:"order_index"},
+  timetable: {eventId:"event_id", time:"time", content:"content", assignee:"assignee", order:"order_index"}
+};
+function rowToDoc(name, row){
+  var map = COLUMN_MAPS[name];
+  var doc = {};
+  Object.keys(map).forEach(function(jsKey){ doc[jsKey] = row[map[jsKey]]; });
+  doc.createdAt = row.created_at ? new Date(row.created_at).getTime() : null;
+  return doc;
+}
+function docToRow(name, data){
+  var map = COLUMN_MAPS[name];
+  var row = {};
+  Object.keys(data).forEach(function(jsKey){
+    var col = map[jsKey];
+    if (col) row[col] = data[jsKey];
+  });
+  return row;
+}
+function genId(name){
+  return name + "-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+function createSupabaseDbApi(sb){
+  function collection(name){
+    return {
+      onSnapshot: function(onNext, onError){
+        function reload(){
+          sb.from(name).select("*").then(function(res){
+            if (res.error){ if (onError) onError({code: res.error.message}); return; }
+            var docs = res.data.map(function(row){
+              return {id: row.id, data: function(){ return rowToDoc(name, row); }};
+            });
+            onNext({docs: docs});
+          });
+        }
+        reload();
+        sb.channel("realtime-"+name)
+          .on("postgres_changes", {event:"*", schema:"public", table:name}, reload)
+          .subscribe();
+      },
+      add: function(data){
+        var id = genId(name);
+        var row = docToRow(name, data);
+        row.id = id;
+        return sb.from(name).insert(row).then(function(res){
+          if (res.error) return Promise.reject({code: res.error.message});
+          return {id: id};
+        });
+      }
+    };
+  }
+  function doc(path){
+    var parts = path.split("/");
+    var name = parts[0], id = parts[1];
+    return {
+      update: function(patch){
+        var row = docToRow(name, patch);
+        return sb.from(name).update(row).eq("id", id).then(function(res){
+          if (res.error) return Promise.reject({code: res.error.message});
+        });
+      },
+      delete: function(){
+        return sb.from(name).delete().eq("id", id).then(function(res){
+          if (res.error) return Promise.reject({code: res.error.message});
+        });
+      }
+    };
+  }
+  return {collection: collection, doc: doc};
+}
+
+// ---------- db wiring ----------
+function subscribe(){
+  dbApi.collection("events").onSnapshot(function(snap){
+    events = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+    refreshAllViews();
+  }, function(err){ showToast("イベントの取得に失敗しました: "+err.code); });
+  dbApi.collection("items").onSnapshot(function(snap){
+    items = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+    refreshAllViews();
+  }, function(err){ showToast("記録の取得に失敗しました: "+err.code); });
+  dbApi.collection("checklist").onSnapshot(function(snap){
+    checklist = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+    refreshAllViews();
+  }, function(err){ showToast("チェックシートの取得に失敗しました: "+err.code); });
+  dbApi.collection("timetable").onSnapshot(function(snap){
+    timetable = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+    refreshAllViews();
+  }, function(err){ showToast("タイムスケジュールの取得に失敗しました: "+err.code); });
+}
+
+function start(saved){
+  state.tab = (saved && saved.tab) || "home";
+  state.selectedEventId = (saved && saved.selectedEventId) || null;
+  var hashTab = (location.hash||"").slice(1);
+  if (["home","events","knowledge"].indexOf(hashTab) !== -1) state.tab = hashTab;
+
+  wireStatic();
+  setTab(state.tab);
+
+  try {
+    var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    dbApi = createSupabaseDbApi(sb);
+  } catch(e){ dbApi = null; }
+  if (dbApi){
+    dbAvailable = true;
+    subscribe();
+  } else {
+    dbAvailable = false;
+    document.getElementById("offline-banner").hidden = false;
+    refreshAllViews();
+  }
+}
+
+start({});
+})();
+</script>
+</body>
+</html>
